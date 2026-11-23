@@ -25,6 +25,7 @@ What CONTRIBUTING.md does not spell out, and agents trip on:
 - **Two platforms.** Windows builds with llvm-mingw, Linux with clang/gcc. Keep host code portable, and paths UTF-8
   (no `CP_ACP`; `tests/test_utf8_paths.py`).
 - **No game in CI.** Checks must run without a dump. A run in the game is for you to do locally and report.
+- **拉取新版本后编译前检查简中翻译。** 每次从上游拉取新版本后，在编译前必须检查 `gpu/vk/menu_i18n.h` 的 `kzh_Hans` 简体中文翻译表是否覆盖 `gpu/vk/vk_menu.cpp` 中新增的菜单项与说明文本；如有缺失先补全翻译（保持字典序并保留 printf 占位符与前后导空格），运行 `python -I tests/test_menu_i18n.py` 与 `python -I tests/test_menu_i18n_count.py` 校验通过后再进行编译。
 - **Builds and game runs go through the PC's job queue** (`scripts/job_queue.py`): `--mode timing` for numbers,
   `--mode shared` for every other game run. Never on a RAM file system
   (`/tmp` is often one): [Sharing a PC](docs/development.md#sharing-a-pc-the-job-queue).

@@ -581,13 +581,12 @@ static Run *texture_runs(const uint8_t *t, long tn, const int *bind, size_t *nru
     return runs;
 }
 
-/* the face whose textures a face shows (the keyboard's: the Switch's), and the controls they follow (the keyboard face: the
-   Switch's own, its default controls: the game's pictures as they are); own: room for those */
-static int texture_face(int face) { return face == HOS_PROMPT_KEYBOARD ? HOS_PROMPT_SWITCH : face; }
+/* the face whose textures a face shows, and the controls they follow (the keyboard face: the keys bound to each Switch
+   button, bind + HOS_SW_N) */
+static int texture_face(int face) { return face; }
 static const int *texture_bind(int face, const int *bind, int *own) {
-    if (face != HOS_PROMPT_KEYBOARD) return bind;
-    for (int b = 0; b < HOS_SW_N; b++) own[b] = switch_pad[b];
-    return own;
+    (void)own;
+    return face == HOS_PROMPT_KEYBOARD ? bind + HOS_SW_N : bind;
 }
 
 static void live_textures_start(const char *bntx, const Run *runs, size_t nruns);
