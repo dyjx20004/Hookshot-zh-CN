@@ -5,12 +5,52 @@
 </a>
 
   <br>
-  <b>Hookshot</b>
+  <b>Hookshot (zh-CN 简体中文优化版)</b>
   <br>
 </h1>
 
 <h4 align="center">The Legend of Zelda: Ocarina of Time (Nintendo Switch 2) running natively on Windows & Linux, with no emulator.
 </h4>
+
+---
+
+## 🇨🇳 中文定制版说明（Hookshot-zh-CN）
+
+本仓库是基于上游 **Hookshot**（稳定基线提交 `29619a1`）维护的简体中文增强与体验优化分支，遵循 **GPL-3.0** 协议开源。
+
+> [!IMPORTANT]
+> **合规声明：** 本仓库仅包含重编译器、运行库与 Vulkan 渲染器源码及构建脚本，**不包含任何游戏本体文件（`.nup` / `.nsp` / `.xci` / `romfs` / `exefs`）、密钥、固件、存档或预编译的游戏可执行文件**，也不提供获取途径。你必须使用自己合法拥有的正版游戏副本在本地自行构建。
+
+### ✨ 本分支主要改进
+
+1. **内置菜单（F1 / Insert）100% 简体中文汉化**
+   - 完整补全 `gpu/vk/menu_i18n.h`（`kzh_Hans`）中全部 **931 条**界面选项、分类标题、动态状态提示与右侧详细帮助说明，修正格式占位符与术语统一性，并通过全部国际化单元测试。
+2. **键鼠模式「时之笛」演奏琴谱按键图标原生适配**
+   - 扩展 `nx2/prompt_assets.py` 与 `host/prompts.c` 的键盘提示贴图生成与映射逻辑：使用键盘与鼠标操作演奏时之笛时，五线谱音符直接显示当前实际绑定的**键盘按键**与**高清抗锯齿鼠标按键图标**，不再回退显示 Switch 手柄按键。
+3. **锁定实机验证的稳定图形基线**
+   - 基于上游稳定提交 `29619a1` 构建，规避后续实验性 GPU ASTC 计算着色器重写在部分 RTX 40 系显卡上导致的光照贴图与角色材质发黑/异常问题。
+4. **完整支持 NVIDIA DLSS / DLAA 与 DLSS 帧生成（FG）**
+   - 支持通过 `scripts/ngx_sdk.py` 拉取并校验 NVIDIA NGX SDK，编译开启原生 DLSS 超分辨率（含 Transformer 模型）与 DLSS 帧生成。
+
+### 🛠️ Windows 源码构建速览
+
+1. **准备依赖工具链**（详见下方英文 [Build from source](#build-from-source) 章节）：
+   - 配置环境变量指向对应工具目录：`HOOKSHOT_MINGW`（`llvm-mingw`）、`RX_CPM`、`WGPU_NATIVE`。
+   - *(可选，启用 NVIDIA DLSS / DLSS FG)* 下载官方 NGX SDK 并设置环境变量：
+     ```powershell
+     python -I scripts/ngx_sdk.py --out work/ngx-sdk
+     $env:HOOKSHOT_NGX_SDK = "$PWD\work\ngx-sdk"
+     ```
+2. **首次从正版游戏副本构建**（需支持版本：Program `0400486024DEC000`，Update `v131072`，Build `e0f3ccfa`）：
+   ```powershell
+   python -I -u nx2/make_game.py --romfs "<你的romfs目录>" --exefs "<你的exefs目录>" --out work/game --lang zh-Hans --jobs 8
+   ```
+3. **增量更新已构建的游戏目录**：
+   ```powershell
+   python -I -u nx2/make_game.py --update work/game --jobs 8
+   ```
+
+---
 
 
 <p align="center">
