@@ -394,6 +394,11 @@ class Icons:
         from fontTools.ttLib import TTFont
         if face == "switch":
             self.path, self.code = io.BytesIO(otf), {p: SWITCH_ICON[p] for p in PADS}
+        elif face == "keyboard":
+            self.path = os.path.join(KENNEY_KEYBOARD, prompt_keys.FONT)
+            rev = {n: c for c, n in TTFont(self.path).getBestCmap().items()}
+            self.code = {k: rev[prompt_keys.kenney_name(k)] for k in sorted(prompt_keys.KEYS)
+                         if prompt_keys.kenney_name(k) in rev}
         else:
             f = FACES[face]
             prefix, names = f["prefix"], f["icons"]
@@ -446,18 +451,43 @@ def face_layers(b, tex, face, otf):
     def keep(sw, pad):   # (the Switch face's default controls: the game's own textures)
         return pad in icons.code and not (face == "switch" and DEFAULT[SW[sw]] == pad)
 
+    inputs = sorted(icons.code) if face == "keyboard" else PADS
     for name, sw in NOTES.items():
         t = tex[name]
         w, h = t[2], t[3]
-        for pad in PADS:
+        for pad in inputs:
             if not keep(sw, pad):
                 continue
-            icon, shape, holes = icons.masks(pad, int(min(w, h) * 0.9))
-            im = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-            o = ((w - icon.width) // 2, (h - icon.height) // 2)
-            im.paste(Image.new("RGBA", icon.size, (255, 255, 255, 255)), o, shape)
-            im.paste(Image.new("RGBA", icon.size, (0, 0, 0, 255)), o, holes)
-            layers.append(Layer(f"{name}.{pad}.png", name, SW[sw], PADS.index(pad), im))
+            if face == "keyboard" and pad == 0x01:
+                W, H = w * 4, h * 4
+                im4 = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+                d4 = ImageDraw.Draw(im4)
+                side = int(min(W, H) * 0.88)
+                cx, cy = W / 2, H / 2
+                x0, y0 = cx - side / 2, cy - side / 2
+                d4.rounded_rectangle((x0, y0, x0 + side, y0 + side), radius=side * 0.2, fill=(255, 255, 255, 255))
+                mw, mh = side * 0.52, side * 0.76
+                mx0, my0, mx1, my1 = cx - mw / 2, cy - mh / 2, cx + mw / 2, cy + mh / 2
+                d4.rounded_rectangle((mx0, my0, mx1, my1), radius=mw / 2, fill=(0, 0, 0, 255))
+                g = side * 0.06
+                m4 = Image.new("L", (W, H), 0)
+                dm = ImageDraw.Draw(m4)
+                dm.rounded_rectangle((mx0 + g, my0 + g, mx1 - g, my1 - g), radius=mw / 2 - g, fill=255)
+                dm.rectangle((cx - g / 2, 0, W, H), fill=0)
+                dm.rectangle((0, cy - side * 0.02, W, H), fill=0)
+                im4.paste((255, 255, 255, 255), (0, 0), m4)
+                im = im4.resize((w, h), Image.LANCZOS)
+            else:
+                icon, shape, holes = icons.masks(pad, int(min(w, h) * 0.9))
+                im = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+                o = ((w - icon.width) // 2, (h - icon.height) // 2)
+                im.paste(Image.new("RGBA", icon.size, (255, 255, 255, 255)), o, shape)
+                im.paste(Image.new("RGBA", icon.size, (0, 0, 0, 255)), o, holes)
+            tag = f"0x{pad:02x}" if face == "keyboard" else pad
+            idx = pad if face == "keyboard" else PADS.index(pad)
+            layers.append(Layer(f"{name}.{tag}.png", name, SW[sw], idx, im))
+    if face == "keyboard":
+        return hand_layers(face, layers)
     for name, sw in LETTERS.items():
         t = tex[name]
         w, h = t[2], t[3]
@@ -1371,7 +1401,7 @@ def generate(a):
         os.makedirs(d, exist_ok=True)
         if hint:
             write_hint(os.path.join(d, "hint.bin"), widths[face], hint)
-    drawn = [face for face in faces if textures and face != "keyboard"]   # (the keyboard's: the Switch's textures, host/prompts.c)
+    drawn = [face for face in faces if textures]
     jobs = face_jobs(len(drawn)) if not a.dump else 1
     if jobs > 1:
         # each face's textures in a process of its own: ~25 s of one core each, five faces one after another were
