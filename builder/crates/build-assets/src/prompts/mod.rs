@@ -75,7 +75,7 @@ pub fn wrap(key: u32, otf: &[u8]) -> Vec<u8> {
 
 /// The recipes' versions: raised when the same inputs would make another output ([`crate::cache`]).
 const FONT_RECIPE: &str = "prompts font 1";
-const TEXTURES_RECIPE: &str = "prompts textures 1";
+const TEXTURES_RECIPE: &str = "prompts textures 2";
 const LAYOUT_RECIPE: &str = "prompts layouts 2";
 
 /// Where the prompts' own inputs are (the repository's, not the game's).
@@ -282,14 +282,18 @@ pub fn make(
     let mut bntx_key = Key::new();
     bntx_key.text("recipe", TEXTURES_RECIPE);
     romfs_key(&mut bntx_key, textures::TEXTURES)?;
-    // (the keyboard's: the Switch's textures, host/prompts.c)
-    let drawn: Vec<&str> = names.iter().copied().filter(|f| *f != "keyboard").collect();
+    let drawn: Vec<&str> = names.to_vec();
     let mut todo = Vec::new();
     for &face in &drawn {
         let mut key = bntx_key.clone();
         key.text("face", face);
         romfs_key(&mut key, FONT)?;
-        if let Some(f) = faces::face(face) {
+        if face == "keyboard" {
+            if romfs.has(keys::LABEL_FONT) {
+                romfs_key(&mut key, keys::LABEL_FONT)?;
+            }
+            key.text("kenney", &kenney.get(keys::FONT).map(|b| build_core::key::sha1_hex(b)).unwrap_or_default());
+        } else if let Some(f) = faces::face(face) {
             key.text("kenney", &kenney.get(f.font).map(|b| build_core::key::sha1_hex(b)).unwrap_or_default());
         }
         cache.key_tree(&mut key, "hand", &sources.faces.join(face), ".png")?;
@@ -321,6 +325,11 @@ pub fn make(
             return Ok(done);
         }
         let textures = read.unwrap_or_default();
+        let label_font = if todo.iter().any(|(f, _, _)| *f == "keyboard") && romfs.has(keys::LABEL_FONT) {
+            Some(unwrap(&dicts()?.read(romfs, keys::LABEL_FONT)?)?.1)
+        } else {
+            None
+        };
         let next = AtomicUsize::new(0);
         let results: Vec<Mutex<Option<Result<()>>>> = todo.iter().map(|_| Mutex::new(None)).collect();
         std::thread::scope(|s| {
@@ -334,6 +343,7 @@ pub fn make(
                             &b,
                             &textures,
                             &game_font.1,
+                            label_font.as_deref(),
                             &kenney,
                             sources,
                             out,
@@ -388,6 +398,7 @@ fn face_file(
     bntx: &[u8],
     textures: &HashMap<String, Texture>,
     game_font: &[u8],
+    label_font: Option<&[u8]>,
     kenney: &BTreeMap<String, Vec<u8>>,
     sources: &Sources,
     out: &Path,
@@ -395,11 +406,17 @@ fn face_file(
     report: &Reporter,
 ) -> Result<()> {
     let hand = sources.faces.join(face);
+    let kenney_font = if face == "keyboard" {
+        kenney.get(keys::FONT).map(Vec::as_slice)
+    } else {
+        faces::face(face).and_then(|f| kenney.get(f.font)).map(Vec::as_slice)
+    };
     let inp = textures::Inputs {
         bntx,
         textures,
         game_font,
-        kenney: faces::face(face).and_then(|f| kenney.get(f.font)).map(Vec::as_slice),
+        label_font,
+        kenney: kenney_font,
         hand: hand.is_dir().then_some(hand.as_path()),
     };
     let layers = textures::face_layers(face, &inp, &mut |l| report.log(l))?;

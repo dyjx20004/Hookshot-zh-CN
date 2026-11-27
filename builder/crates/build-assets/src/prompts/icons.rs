@@ -26,6 +26,11 @@ impl Icons {
     /// The icons of `face`: the game's font's for `switch` (`game`: the unwrapped font), else the face's Kenney font
     /// (`kenney`). A pad input the face has no glyph for (in its cmap) has none.
     pub fn new(face: &str, game: &[u8], kenney: Option<&[u8]>) -> Result<Icons> {
+        Self::new_with_label(face, game, None, kenney)
+    }
+
+    /// The icons of `face`, with `label` (the game's bold font) for the keyboard face's word keys.
+    pub fn new_with_label(face: &str, game: &[u8], label: Option<&[u8]>, kenney: Option<&[u8]>) -> Result<Icons> {
         fn parse<'b>(b: &'b [u8], what: &str) -> Result<ttf_parser::Face<'b>> {
             let f = ttf_parser::Face::parse(b, 0)
                 .map_err(|e| Error::format(what, format!("not a font this reads ({e})")))?;
@@ -42,6 +47,11 @@ impl Icons {
                 .map(|&c| char::from_u32(c).and_then(|c| f.glyph_index(c)).map(|g| Outline::of(&f, g)))
                 .collect();
             return Ok(Icons { outlines, upem: f64::from(f.units_per_em()) });
+        }
+        if face == "keyboard" {
+            let bytes = kenney.ok_or_else(|| Error::format(super::keys::FONT, "Kenney's font is missing"))?;
+            let (outlines, upem) = super::glyphs::keyboard_icon_outlines(label, bytes)?;
+            return Ok(Icons { outlines, upem });
         }
         let spec = faces::face(face).ok_or_else(|| Error::format("prompts", format!("no face {face}")))?;
         let bytes = kenney.ok_or_else(|| Error::format(spec.font, "Kenney's font is missing"))?;

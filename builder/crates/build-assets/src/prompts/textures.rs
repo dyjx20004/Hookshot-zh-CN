@@ -109,6 +109,8 @@ pub struct Inputs<'a> {
     pub textures: &'a HashMap<String, Texture>,
     /// The game's icon font (unwrapped).
     pub game_font: &'a [u8],
+    /// The game's bold font (unwrapped), for the keyboard's word keys.
+    pub label_font: Option<&'a [u8]>,
     /// The face's Kenney font.
     pub kenney: Option<&'a [u8]>,
     /// The folder of the face's hand-made pictures (`<faces>/<face>/`), if any.
@@ -146,8 +148,34 @@ fn layer(name: String, texture: &'static str, sw: u8, pad: u8, im: Image) -> Lay
 /// A face's layers, in `textures.bin`'s order, each a hand-made one when the face's folder has it. `log` hears of a
 /// game line not found.
 pub fn face_layers(face: &str, inp: &Inputs<'_>, log: &mut dyn FnMut(String)) -> Result<Vec<Layer>> {
-    let icons = Icons::new(face, inp.game_font, inp.kenney)?;
+    let icons = Icons::new_with_label(face, inp.game_font, inp.label_font, inp.kenney)?;
     let mut layers = Vec::new();
+    if face == "keyboard" {
+        let mut by_size: HashMap<(usize, usize), Vec<(u8, Image)>> = HashMap::new();
+        for (name, s) in NOTES {
+            let t = inp.tex(name)?;
+            let (w, h) = (t.width, t.height);
+            let imgs = by_size.entry((w, h)).or_insert_with(|| {
+                let size = (w.min(h) as f64 * 0.9) as usize;
+                (1..256usize)
+                    .filter(|&code| icons.has(code))
+                    .map(|code| {
+                        let m = icons.masks(code, size);
+                        let mut im = Image::rgba(w, h);
+                        let (ox, oy) = (((w - m.icon.width) / 2) as i64, ((h - m.icon.height) / 2) as i64);
+                        im.paste_colour(&[255, 255, 255, 255], &m.shape, ox, oy);
+                        im.paste_colour(&[0, 0, 0, 255], &m.holes, ox, oy);
+                        (code as u8, im)
+                    })
+                    .collect()
+            });
+            for (code, im) in imgs.iter() {
+                layers.push(layer(format!("{name}.0x{code:02x}.png"), name, sw(s) as u8, *code, im.clone()));
+            }
+        }
+        hand_layers(inp, &mut layers)?;
+        return Ok(layers);
+    }
     // (the Switch face's default controls: the game's own textures)
     let keep = |s: &str, p: usize| icons.has(p) && !(face == "switch" && DEFAULT[sw(s)] == PADS[p]);
     for (name, s) in NOTES {

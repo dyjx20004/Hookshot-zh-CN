@@ -34,6 +34,11 @@ project.
 
 **[Join us on Discord](https://discord.gg/magicbean)!**
 
+> [!TIP]
+> **简体中文全量汉化与定制增强版（支持 DLSS 5 & RTX 20/30/40 FP16）**
+> - **当前主线（`main`）**：基于上游最新开发主线构建，支持 **DLSS 5 实时神经渲染**（含 RTX 50 系原生版与 Windows RTX 20/30/40 系 `ngx/fp16/nvngx_dlssnr.dll` FP16 运行库转发支持）、**1,168 条简体中文菜单完整汉化**（覆盖图形、DLSS 5 预设/光照/材质保护、帧生成、手柄、键鼠与模组/金手指全部词条）以及**键鼠模式时之笛琴谱按键图标实时动态替换补丁**。
+> - **稳定版回退分支**：若需回退至经过充分验证的 `v3.2.0` 稳定汉化定制版，可随时检出分支 `stable-v3.2.0`（或标签 `v3.2.0-zh-CN`）；早期 Hookshot 归档保留在分支 `hookshot-legacy`。
+
 > [!IMPORTANT]
 > This repository **does not contain the game, keys or an executable**, and it does not explain how to get them. You
 > need your own copy. Everything the build creates (`longshot.exe`, the generated code, the shader caches and your

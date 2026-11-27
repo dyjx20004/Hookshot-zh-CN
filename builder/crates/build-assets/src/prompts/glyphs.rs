@@ -351,6 +351,43 @@ fn keyboard_glyphs(
     Ok((placed, widths))
 }
 
+/// Each virtual-key code's (0..256) icon outline for texture masks, scaled comfortably within `upem`.
+pub(super) fn keyboard_icon_outlines(
+    label_font: Option<&[u8]>,
+    kenney_font: &[u8],
+) -> Result<(Vec<Option<Outline>>, f64)> {
+    let face = ttf_parser::Face::parse(kenney_font, 0)
+        .map_err(|e| Error::format(keys::FONT, format!("not a font this reads ({e})")))?;
+    if face.units_per_em() < 64 {
+        return Err(Error::format(keys::FONT, format!("{} units an em: not a font this reads", face.units_per_em())));
+    }
+    let upem = f64::from(face.units_per_em());
+    let b = (0.0, 0.0, upem * 0.8, upem * 0.8);
+    let k = Kenney { face };
+    let label = label_font.and_then(|bytes| ttf_parser::Face::parse(bytes, 0).ok()).map(|face| Label { face });
+    let mut outlines = Vec::with_capacity(256);
+    outlines.push(None);
+    for code in 1..256u32 {
+        let o = if let Some(which) = keys::mouse(code) {
+            Some(mouse(which, b))
+        } else if let Some((o, _)) = label.as_ref().zip(keys::label(code)).and_then(|(l, text)| word_key(&text, b, l)) {
+            Some(o)
+        } else if keys::key(code).is_some() {
+            k.glyph(&keys::kenney_name(code)).map(|g| match g.bounds() {
+                Some((x0, y0, x1, y1)) if (x1 - x0).max(y1 - y0) > upem * 1.8 => {
+                    let s = upem / (x1 - x0).max(y1 - y0);
+                    g.transformed(s, 0.0, 0.0)
+                }
+                _ => g,
+            })
+        } else {
+            None
+        };
+        outlines.push(o);
+    }
+    Ok((outlines, upem))
+}
+
 #[cfg(test)]
 impl Contour {
     fn bounds_check(&self) -> (f64, f64, f64, f64) {

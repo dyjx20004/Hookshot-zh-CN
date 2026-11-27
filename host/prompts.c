@@ -646,11 +646,15 @@ static Run *texture_runs(const uint8_t *t, long tn, const int *bind, size_t *nru
     return runs;
 }
 
-/* the face whose textures a face shows (the keyboard's: the Switch's), and the controls they follow (the keyboard face: the
-   Switch's own, its default controls: the game's pictures as they are); own: room for those */
-static int texture_face(int face) { return face == HOS_PROMPT_KEYBOARD ? HOS_PROMPT_SWITCH : face; }
-static const int *texture_bind(int face, const int *bind, int *own) {
+/* the face whose textures a face shows (the keyboard's: its own when built, else the Switch's), and the controls they follow
+   (the keyboard face: its bound keys when built, else the Switch's default controls); own: room for those */
+static int keyboard_textures(const char *dir);
+static int texture_face(const char *dir, int face) {
+    return face == HOS_PROMPT_KEYBOARD && !keyboard_textures(dir) ? HOS_PROMPT_SWITCH : face;
+}
+static const int *texture_bind(const char *dir, int face, const int *bind, int *own) {
     if (face != HOS_PROMPT_KEYBOARD) return bind;
+    if (keyboard_textures(dir)) return bind + HOS_SW_N;
     for (int b = 0; b < HOS_SW_N; b++) own[b] = switch_pad[b];
     return own;
 }
@@ -687,7 +691,7 @@ static int build_textures(char *out, size_t cap) {
     char dir[MAX_PATH], path[MAX_PATH];
     int face;
     if (!setup(dir, sizeof dir, &face)) return 0;
-    snprintf(path, sizeof path, "%sprompts/%s/textures.bin", dir, faces[texture_face(face)]);
+    snprintf(path, sizeof path, "%sprompts/%s/textures.bin", dir, faces[texture_face(dir, face)]);
     long tn;
     uint8_t *t = read_all(path, "HPTX", &tn);
     if (!t) return 0;   /* (built without the textures: the game's) */
@@ -699,7 +703,7 @@ static int build_textures(char *out, size_t cap) {
     current_binds(bind);
     uint64_t h = fnv(fnv(fnv(0xcbf29ce484222325ull, &face, sizeof face), bind, BUTTON_BINDS * sizeof *bind), t, (size_t)tn);
     size_t nruns;
-    Run *runs = texture_runs(t, tn, texture_bind(face, bind, own), &nruns);
+    Run *runs = texture_runs(t, tn, texture_bind(dir, face, bind, own), &nruns);
     live_textures_start(&tex_base, runs, nruns);   /* (before write_patched sorts them: the ranges only) */
     char keypath[MAX_PATH], made[MAX_PATH];
     const int have = made_dir(made, sizeof made);
@@ -907,10 +911,17 @@ void hos_prompts_pool_gone(uint64_t mem) {
                 (unsigned long long)mem);
 }
 
+static int keyboard_textures(const char *dir) {
+    char path[MAX_PATH];
+    if (tex.bins[HOS_PROMPT_KEYBOARD]) return 1;
+    snprintf(path, sizeof path, "%sprompts/keyboard/textures.bin", dir);
+    return GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES;
+}
+
 /* the pool's textures as this face and these controls choose them; 0 when they could not be */
 /* the face's textures.bin, read once (before tex_lock: a finalize waits for the writes alone); 0 none */
 static int texture_bin(const char *dir, int face) {
-    face = texture_face(face);
+    face = texture_face(dir, face);
     if (!tex.bins[face]) {
         char path[MAX_PATH];
         snprintf(path, sizeof path, "%sprompts/%s/textures.bin", dir, faces[face]);
@@ -924,7 +935,8 @@ static int live_textures(const char *dir, int face, const int *bind) {
     size_t nruns, written, put_back;
     if (!__atomic_load_n(&tex.l.base, __ATOMIC_ACQUIRE)) return 0;   /* (finalized since: hos_prompts_pool_gone; tex_lock held) */
     int own[HOS_SW_N];
-    Run *runs = texture_runs(tex.bins[texture_face(face)], tex.nbins[texture_face(face)], texture_bind(face, bind, own), &nruns);
+    const int tf = texture_face(dir, face);
+    Run *runs = texture_runs(tex.bins[tf], tex.nbins[tf], texture_bind(dir, face, bind, own), &nruns);
     const size_t outside = put_runs(&tex.l, runs, nruns, &written, &put_back);
     free(runs);
     hos_log("prompts: now %s textures: %zu runs written, %zu put back%s", faces[face], written, put_back,
